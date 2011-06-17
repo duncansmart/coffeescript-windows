@@ -1,0 +1,40 @@
+<job>
+<!-- https://github.com/jashkenas/coffee-script/raw/master/extras/coffee-script.js -->
+<script src="coffee-script.js" language="JScript" />
+<script language="JScript">
+(function () {
+    
+    var fso = new ActiveXObject("Scripting.FileSystemObject");
+
+    var coffeeFile;
+    if (WScript.Arguments.Length == 0) {
+        WScript.StdErr.WriteLine("Error: no input file specified (use '-' for STDIN)");
+        WScript.Quit(1);
+    }
+    
+    var coffeeFile = WScript.Arguments.Item(0)
+    var coffeeSource;
+    if (coffeeFile == '-') {
+        var chunks = [];
+        while (!WScript.StdIn.AtEndOfStream)
+            chunks.push(WScript.StdIn.ReadAll());
+        coffeeSource = chunks.join('');
+    }
+    else {
+        var file = fso.OpenTextFile(coffeeFile);
+        coffeeSource = file.ReadAll();
+        file.Close();
+    }
+    
+    try {
+        var js = CoffeeScript.compile(coffeeSource);
+        WScript.StdOut.Write(js);
+        WScript.Quit(0);
+    }
+    catch (err) {
+        WScript.StdErr.WriteLine(err.message);
+        WScript.Quit(1);
+    }
+})();
+</script>
+</job>
