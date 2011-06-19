@@ -6,14 +6,12 @@ A simple command-line utilty for Windows that will compile `*.coffee` files to J
 
 To use it, invoke coffee.cmd like so:
 
-    coffee input.coffee > output.js
+    coffee input.coffee output.js
     
-If you specify `-` as the input, the coffeescript will be read from STDIN. e.g.
+If an output is not specified, it it written to STDOUT. In neither an input or ourput are specified then data is assumed to be on STDIN. For example:
 
-    coffee - > output.js < input.coffee
+    type input.coffee | coffee > output.js
 
-or:
-
-    type input.coffee | coffee - > output.js
+Errors are written to STDERR.
 
 In the `test` directory there's a version of the standard CoffeeScript tests which can be kicked off using `test.cmd`. The test just attempts to compile the *.coffee files but doesn't execute them.
