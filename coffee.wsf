@@ -4,31 +4,30 @@
 <script language="JScript">
 (function () {
     
+    var args = [];
+    for(var i = 0; i < WScript.Arguments.Length; i++)
+        args.push(WScript.Arguments.Item(i));
+
     var fso = new ActiveXObject("Scripting.FileSystemObject");
 
-    var coffeeFile;
-    if (WScript.Arguments.Length == 0) {
-        WScript.StdErr.WriteLine("Error: no input file specified (use '-' for STDIN)");
-        WScript.Quit(1);
-    }
+    var input, output;    
+    input = WScript.StdIn;
+    output = WScript.StdOut;
+            
+    if (args[0])
+        input = fso.OpenTextFile(args[0]);
+    if (args[1])
+        output = fso.CreateTextFile(args[1]);
     
-    var coffeeFile = WScript.Arguments.Item(0)
-    var coffeeSource;
-    if (coffeeFile == '-') {
-        var chunks = [];
-        while (!WScript.StdIn.AtEndOfStream)
-            chunks.push(WScript.StdIn.ReadAll());
-        coffeeSource = chunks.join('');
-    }
-    else {
-        var file = fso.OpenTextFile(coffeeFile);
-        coffeeSource = file.ReadAll();
-        file.Close();
-    }
+    // Read all input data into string
+    var chunks = [];
+    while (!input.AtEndOfStream)
+        chunks.push(input.ReadAll());
+    var coffee = chunks.join('');
     
     try {
-        var js = CoffeeScript.compile(coffeeSource);
-        WScript.StdOut.Write(js);
+        var js = CoffeeScript.compile(coffee);
+        output.Write(js);
         WScript.Quit(0);
     }
     catch (err) {
