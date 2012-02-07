@@ -18,8 +18,9 @@
       f = fso.getfolder(args[0]);
       e = new Enumerator(f.files);
       for( ; !e.atEnd(); e.moveNext() ) {
-        WScript.Echo(e.item());
-        convert(e.item(),args[1]);
+        if (e.item().path.toLowerCase().lastIndexOf('.coffee') != -1) {
+          convert(e.item(),args[1]);
+		}  
       }
     }
     else {
