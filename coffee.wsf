@@ -34,36 +34,60 @@ function convert(input, output) {
 
     var fso = new ActiveXObject("Scripting.FileSystemObject");
 
-    if (!input) {
-        input = WScript.StdIn;
-    }
-
     if (output) {
+        // if output specifies a folder name, output filename is same as input filename with .coffee extension
         if (fso.folderExists(output)) {
             output = output + '\\' + fso.getFile(input).name.replace('\.coffee', '.js')
         }
-        output = fso.CreateTextFile(output);
+    }
+
+    var coffee;
+    if (!input) { 
+        // Read all input data from STDIN
+        var chunks = [];
+        while (!WScript.StdIn.AtEndOfStream)
+            chunks.push(WScript.StdIn.ReadAll());
+        coffee = chunks.join('');
     }
     else {
-        output = WScript.StdOut;
+        coffee = readUtf8(input);
     }
-
-    input = fso.OpenTextFile(input);
-
-    // Read all input data into string
-    var chunks = [];
-    while (!input.AtEndOfStream)
-        chunks.push(input.ReadAll());
-    var coffee = chunks.join('');
 
     try {
         var js = CoffeeScript.compile(coffee);
-        output.Write(js);
+        
+        if (!output) {
+            WScript.StdOut.Write(js);
+        }
+        else {
+            writeUtf8(output, js);
+        }
     }
     catch (err) {
         WScript.StdErr.WriteLine(err.message);
         WScript.Quit(1);
     }
+}
+
+function readUtf8(filename) {
+	var stream = new ActiveXObject("ADODB.Stream");
+	stream.Open();
+	stream.Type = 2; // Text
+	stream.Charset = 'utf-8';
+	stream.LoadFromFile(filename);
+	var text = stream.ReadText();
+	stream.Close();
+	return text;
+}
+
+function writeUtf8(filename, text) {
+	var stream = new ActiveXObject("ADODB.Stream");
+	stream.Open();
+	stream.Type = 2; // Text
+	stream.Charset = 'utf-8';
+	stream.WriteText(text);
+	stream.SaveToFile(filename, 2);
+	stream.Close();
 }
 </script>
 </job>
