@@ -2,7 +2,7 @@
 # -------
 
 # pull the helpers from `CoffeeScript.helpers` into local variables
-{starts, ends, compact, count, merge, extend, flatten, del, last} = CoffeeScript.helpers
+{starts, ends, repeat, compact, count, merge, extend, flatten, del, last, baseFileName} = CoffeeScript.helpers
 
 
 # `starts`
@@ -25,6 +25,15 @@ test "the `ends` helper tests if a string ends with another string", ->
 test "the `ends` helper can take an optional offset", ->
   ok     ends('01234', '012', 2)
   ok not ends('01234', '234', 6)
+
+
+# `repeat`
+
+test "the `repeat` helper concatenates a given number of times", ->
+  eq 'asdasdasd', repeat('asd', 3)
+
+test "`repeat`ing a string 0 times always returns the empty string", ->
+  eq '', repeat('whatever', 0)
 
 
 # `compact`
@@ -94,3 +103,33 @@ test "the `last` helper returns the last item of an array-like object", ->
 test "the `last` helper allows one to specify an optional offset", ->
   ary = [0, 1, 2, 3, 4]
   eq 2, last(ary, 2)
+
+# `baseFileName`
+
+test "the `baseFileName` helper returns the file name to write to", ->
+  ext = '.js'
+  sourceToCompiled =
+    '.coffee': ext
+    'a.coffee': 'a' + ext
+    'b.coffee': 'b' + ext
+    'coffee.coffee': 'coffee' + ext
+
+    '.litcoffee': ext
+    'a.litcoffee': 'a' + ext
+    'b.litcoffee': 'b' + ext
+    'coffee.litcoffee': 'coffee' + ext
+
+    '.lit': ext
+    'a.lit': 'a' + ext
+    'b.lit': 'b' + ext
+    'coffee.lit': 'coffee' + ext
+
+    '.coffee.md': ext
+    'a.coffee.md': 'a' + ext
+    'b.coffee.md': 'b' + ext
+    'coffee.coffee.md': 'coffee' + ext
+
+  for sourceFileName, expectedFileName of sourceToCompiled
+    name = baseFileName sourceFileName, yes
+    filename = name + ext
+    eq filename, expectedFileName

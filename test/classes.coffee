@@ -117,24 +117,23 @@ test "basic classes, again, but in the manual prototype style", ->
   ok (new ThirdChild)['func-func']('thing') is 'dynamic-thing'
 
 
-test "super with plain ol' functions as the original constructors", ->
+test "super with plain ol' prototypes", ->
 
-TopClass = (arg) ->
-  @prop = 'top-' + arg
-  this
+  TopClass = ->
+  TopClass::func = (arg) ->
+    'top-' + arg
 
-SuperClass = (arg) ->
-  super 'super-' + arg
-  this
+  SuperClass = ->
+  SuperClass extends TopClass
+  SuperClass::func = (arg) ->
+    super 'super-' + arg
 
-SubClass = ->
-  super 'sub'
-  this
+  SubClass = ->
+  SubClass extends SuperClass
+  SubClass::func = ->
+    super 'sub'
 
-SuperClass extends TopClass
-SubClass extends SuperClass
-
-ok (new SubClass).prop is 'top-super-sub'
+  eq (new SubClass).func(), 'top-super-sub'
 
 
 test "'@' referring to the current instance, and not being coerced into a call", ->
@@ -274,6 +273,25 @@ test "nothing classes", ->
   ok c instanceof Function
 
 
+test "classes with static-level implicit objects", ->
+
+  class A
+    @static = one: 1
+    two: 2
+
+  class B
+    @static = one: 1,
+    two: 2
+
+  eq A.static.one, 1
+  eq A.static.two, undefined
+  eq (new A).two, 2
+
+  eq B.static.one, 1
+  eq B.static.two, 2
+  eq (new B).two, undefined
+
+
 test "classes with value'd constructors", ->
 
   counter = 0
@@ -294,7 +312,7 @@ test "classes with value'd constructors", ->
   eq (new Two).value, 2
 
 
-test "exectuable class bodies", ->
+test "executable class bodies", ->
 
   class A
     if true
@@ -306,6 +324,17 @@ test "exectuable class bodies", ->
 
   eq a.b, 'b'
   eq a.c, undefined
+
+
+test "#2502: parenthesizing inner object values", ->
+
+  class A
+    category:  (type: 'string')
+    sections:  (type: 'number', default: 0)
+
+  eq (new A).category.type, 'string'
+
+  eq (new A).sections.default, 0
 
 
 test "mild metaprogramming", ->
@@ -471,8 +500,282 @@ test "#1182: execution order needs to be considered as well", ->
 test "#1182: external constructors with bound functions", ->
   fn = ->
     {one: 1}
+    this
   class B
   class A
     constructor: fn
     method: => this instanceof A
   ok (new A).method.call(new B)
+
+test "#1372: bound class methods with reserved names", ->
+  class C
+    delete: =>
+  ok C::delete
+
+test "#1380: `super` with reserved names", ->
+  class C
+    do: -> super
+  ok C::do
+
+  class B
+    0: -> super
+  ok B::[0]
+
+test "#1464: bound class methods should keep context", ->
+  nonce  = {}
+  nonce2 = {}
+  class C
+    constructor: (@id) ->
+    @boundStaticColon: => new this(nonce)
+    @boundStaticEqual= => new this(nonce2)
+  eq nonce,  C.boundStaticColon().id
+  eq nonce2, C.boundStaticEqual().id
+
+test "#1009: classes with reserved words as determined names", -> (->
+  eq 'function', typeof (class @for)
+  ok not /\beval\b/.test (class @eval).toString()
+  ok not /\barguments\b/.test (class @arguments).toString()
+).call {}
+
+test "#1482: classes can extend expressions", ->
+  id = (x) -> x
+  nonce = {}
+  class A then nonce: nonce
+  class B extends id A
+  eq nonce, (new B).nonce
+
+test "#1598: super works for static methods too", ->
+
+  class Parent
+    method: ->
+      'NO'
+    @method: ->
+      'yes'
+
+  class Child extends Parent
+    @method: ->
+      'pass? ' + super
+
+  eq Child.method(), 'pass? yes'
+
+test "#1842: Regression with bound functions within bound class methods", ->
+
+  class Store
+    @bound: =>
+      do =>
+        eq this, Store
+
+  Store.bound()
+
+  # And a fancier case:
+
+  class Store
+
+    eq this, Store
+
+    @bound: =>
+      do =>
+        eq this, Store
+
+    @unbound: ->
+      eq this, Store
+
+    instance: =>
+      ok this instanceof Store
+
+  Store.bound()
+  Store.unbound()
+  (new Store).instance()
+
+test "#1876: Class @A extends A", ->
+  class A
+  class @A extends A
+
+  ok (new @A) instanceof A
+
+test "#1813: Passing class definitions as expressions", ->
+  ident = (x) -> x
+
+  result = ident class A then x = 1
+
+  eq result, A
+
+  result = ident class B extends A
+    x = 1
+
+  eq result, B
+
+test "#1966: external constructors should produce their return value", ->
+  ctor = -> {}
+  class A then constructor: ctor
+  ok (new A) not instanceof A
+
+test "#1980: regression with an inherited class with static function members", ->
+
+  class A
+
+  class B extends A
+    @static: => 'value'
+
+  eq B.static(), 'value'
+
+test "#1534: class then 'use strict'", ->
+  # [14.1 Directive Prologues and the Use Strict Directive](http://es5.github.com/#x14.1)
+  nonce = {}
+  error = 'do -> ok this'
+  strictTest = "do ->'use strict';#{error}"
+  return unless (try CoffeeScript.run strictTest, bare: yes catch e then nonce) is nonce
+
+  throws -> CoffeeScript.run "class then 'use strict';#{error}", bare: yes
+  doesNotThrow -> CoffeeScript.run "class then #{error}", bare: yes
+  doesNotThrow -> CoffeeScript.run "class then #{error};'use strict'", bare: yes
+
+  # comments are ignored in the Directive Prologue
+  comments = ["""
+  class
+    ### comment ###
+    'use strict'
+    #{error}""",
+  """
+  class
+    ### comment 1 ###
+    ### comment 2 ###
+    'use strict'
+    #{error}""",
+  """
+  class
+    ### comment 1 ###
+    ### comment 2 ###
+    'use strict'
+    #{error}
+    ### comment 3 ###"""
+  ]
+  throws (-> CoffeeScript.run comment, bare: yes) for comment in comments
+
+  # [ES5 §14.1](http://es5.github.com/#x14.1) allows for other directives
+  directives = ["""
+  class
+    'directive 1'
+    'use strict'
+    #{error}""",
+  """
+  class
+    'use strict'
+    'directive 2'
+    #{error}""",
+  """
+  class
+    ### comment 1 ###
+    'directive 1'
+    'use strict'
+    #{error}""",
+  """
+  class
+    ### comment 1 ###
+    'directive 1'
+    ### comment 2 ###
+    'use strict'
+    #{error}"""
+  ]
+  throws (-> CoffeeScript.run directive, bare: yes) for directive in directives
+
+test "#2052: classes should work in strict mode", ->
+  try
+    do ->
+      'use strict'
+      class A
+  catch e
+    ok no
+
+test "#2630: class bodies can't reference arguments", ->
+  throws ->
+    CoffeeScript.compile('class Test then arguments')
+
+test "#2319: fn class n extends o.p [INDENT] x = 123", ->
+  first = ->
+
+  base = onebase: ->
+
+  first class OneKeeper extends base.onebase
+    one = 1
+    one: -> one
+
+  eq new OneKeeper().one(), 1
+
+
+test "#2599: other typed constructors should be inherited", ->
+  class Base
+    constructor: -> return {}
+
+  class Derived extends Base
+
+  ok (new Derived) not instanceof Derived
+  ok (new Derived) not instanceof Base
+  ok (new Base) not instanceof Base
+
+test "#2359: extending native objects that use other typed constructors requires defining a constructor", ->
+  class BrokenArray extends Array
+    method: -> 'no one will call me'
+
+  brokenArray = new BrokenArray
+  ok brokenArray not instanceof BrokenArray
+  ok typeof brokenArray.method is 'undefined'
+
+  class WorkingArray extends Array
+    constructor: -> super
+    method: -> 'yes!'
+
+  workingArray = new WorkingArray
+  ok workingArray instanceof WorkingArray
+  eq 'yes!', workingArray.method()
+
+
+test "#2782: non-alphanumeric-named bound functions", ->
+  class A
+    'b:c': =>
+      'd'
+
+  eq (new A)['b:c'](), 'd'
+
+
+test "#2781: overriding bound functions", ->
+  class A
+    a: ->
+        @b()
+    b: =>
+        1
+
+  class B extends A
+    b: =>
+        2
+
+  b = (new A).b
+  eq b(), 1
+
+  b = (new B).b
+  eq b(), 2
+
+
+test "#2791: bound function with destructured argument", ->
+  class Foo
+    method: ({a}) => 'Bar'
+
+  eq (new Foo).method({a: 'Bar'}), 'Bar'
+
+
+test "#2796: ditto, ditto, ditto", ->
+  answer = null
+
+  outsideMethod = (func) ->
+    func.call message: 'wrong!'
+
+  class Base
+    constructor: ->
+      @message = 'right!'
+      outsideMethod @echo
+
+    echo: =>
+      answer = @message
+
+  new Base
+  eq answer, 'right!'

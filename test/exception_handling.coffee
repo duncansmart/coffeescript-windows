@@ -88,3 +88,44 @@ test "try/catch with empty catch as last statement in a function body", ->
     try nonce
     catch err
   eq nonce, fn()
+
+
+# Catch leads to broken scoping: #1595
+
+test "try/catch with a reused variable name.", ->
+  do ->
+    try
+      inner = 5
+    catch inner
+      # nothing
+  eq typeof inner, 'undefined'
+
+
+# Allowed to destructure exceptions: #2580
+
+test "try/catch with destructuring the exception object", ->
+
+  result = try
+    missing.object
+  catch {message}
+    message
+
+  eq message, 'missing is not defined'
+
+
+
+test "Try catch finally as implicit arguments", ->
+  first = (x) -> x
+
+  foo = no
+  try
+    first try iamwhoiam() finally foo = yes
+  catch e
+  eq foo, yes
+
+  bar = no
+  try
+    first try iamwhoiam() catch e finally
+    bar = yes
+  catch e
+  eq bar, yes
