@@ -15,3 +15,5 @@ If an output is not specified, it is written to `stdout`. In neither an input or
 Errors are written to `stderr`.
 
 In the `test` directory there's a version of the standard CoffeeScript tests which can be kicked off using `test.cmd`. The test just attempts to compile the *.coffee files but doesn't execute them.
+
+To upgrade to the latest CoffeeScript simply replace `coffee-script.js` from the upstream https://github.com/jashkenas/coffee-script/blob/master/extras/coffee-script.js (the tests will likely need updating as well, if you want to run them).

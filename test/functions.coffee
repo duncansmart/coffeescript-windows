@@ -64,6 +64,21 @@ ok obj isnt obj.unbound()
 eq obj, obj.nested()
 
 
+test "even more fancy bound functions", ->
+  obj =
+    one: ->
+      do =>
+        return this.two()
+    two: ->
+      do =>
+        do =>
+          do =>
+            return this.three
+    three: 3
+
+  eq obj.one(), 3
+
+
 test "self-referencing functions", ->
   changeMe = ->
     changeMe = 2
@@ -76,9 +91,16 @@ test "self-referencing functions", ->
 
 test "splats", ->
   arrayEq [0, 1, 2], (((splat...) -> splat) 0, 1, 2)
-  arrayEq [2, 3], (((_, _, splat...) -> splat) 0, 1, 2, 3)
-  arrayEq [0, 1], (((splat..., _, _) -> splat) 0, 1, 2, 3)
-  arrayEq [2], (((_, _, splat..., _) -> splat) 0, 1, 2, 3)
+  arrayEq [2, 3], (((_, _1, splat...) -> splat) 0, 1, 2, 3)
+  arrayEq [0, 1], (((splat..., _, _1) -> splat) 0, 1, 2, 3)
+  arrayEq [2], (((_, _1, splat..., _2) -> splat) 0, 1, 2, 3)
+
+test "destructured splatted parameters", ->
+  arr = [0,1,2]
+  splatArray = ([a...]) -> a
+  splatArrayRest = ([a...],b...) -> arrayEq(a,b); b
+  arrayEq splatArray(arr), arr
+  arrayEq splatArrayRest(arr,0,1,2), arr
 
 test "@-parameters: automatically assign an argument's value to a property of the context", ->
   nonce = {}
@@ -116,7 +138,7 @@ test "destructuring in function definition", ->
 test "default values", ->
   nonceA = {}
   nonceB = {}
-  a = (_,_,arg=nonceA) -> arg
+  a = (_,_1,arg=nonceA) -> arg
   eq nonceA, a()
   eq nonceA, a(0)
   eq nonceB, a(0,0,nonceB)
@@ -124,7 +146,7 @@ test "default values", ->
   eq nonceA, a(0,0,null)
   eq false , a(0,0,false)
   eq nonceB, a(undefined,undefined,nonceB,undefined)
-  b = (_,arg=nonceA,_,_) -> arg
+  b = (_,arg=nonceA,_1,_2) -> arg
   eq nonceA, b()
   eq nonceA, b(0)
   eq nonceB, b(0,nonceB)
@@ -132,7 +154,7 @@ test "default values", ->
   eq nonceA, b(0,null)
   eq false , b(0,false)
   eq nonceB, b(undefined,nonceB,undefined)
-  c = (arg=nonceA,_,_) -> arg
+  c = (arg=nonceA,_,_1) -> arg
   eq nonceA, c()
   eq      0, c(0)
   eq nonceB, c(nonceB)
@@ -163,3 +185,43 @@ test "arguments vs parameters", ->
   doesNotThrow -> CoffeeScript.compile "f(x) ->"
   f = (g) -> g()
   eq 5, f (x) -> 5
+
+test "#1844: bound functions in nested comprehensions causing empty var statements", ->
+  a = ((=>) for a in [0] for b in [0])
+  eq 1, a.length
+
+test "#1859: inline function bodies shouldn't modify prior postfix ifs", ->
+  list = [1, 2, 3]
+  ok true if list.some (x) -> x is 2
+
+test "#2258: allow whitespace-style parameter lists in function definitions", ->
+  func = (
+    a, b, c
+  ) -> c
+  eq func(1, 2, 3), 3
+
+  func = (
+    a
+    b
+    c
+  ) -> b
+  eq func(1, 2, 3), 2
+
+test "#2621: fancy destructuring in parameter lists", ->
+  func = ({ prop1: { key1 }, prop2: { key2, key3: [a, b, c] } }) ->
+    eq(key2, 'key2')
+    eq(a, 'a')
+
+  func({prop1: {key1: 'key1'}, prop2: {key2: 'key2', key3: ['a', 'b', 'c']}})
+
+test "#1435 Indented property access", ->
+  rec = -> rec: rec
+
+  eq 1, do ->
+    rec()
+      .rec ->
+        rec()
+          .rec ->
+            rec.rec()
+          .rec()
+    1
